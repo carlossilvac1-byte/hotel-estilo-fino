@@ -16,7 +16,7 @@ const CONFIG = {
     nome: 'Hotel Estilo Fino — Sistema de Gestão',
     nomeCurto: 'Estilo Fino',
     hotel: 'Hotel Estilo Fino',
-    versao: '1.0.0',
+    versao: '1.0.1',
     prefixoVoucher: 'HEF'
   },
 
@@ -28,8 +28,8 @@ const CONFIG = {
    * NUNCA coloque aqui a chave service_role.
    * ----------------------------------------------------------------- */
   supabase: {
-    url: 'https://SEUPROJETO.supabase.co',
-    anonKey: 'COLOQUE-AQUI-A-CHAVE-ANON',
+    url: 'https://sknwndgkwqocwgxpeclz.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbnduZGdrd3FvY3dneHBlY2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNDk4OTMsImV4cCI6MjEwODcyNTg5M30.4MzOv4I6QaKGlwwhmZANnEDbvzGYYOLvxsPMNNKBNO4',
     tabelaUsuarios: 'usuarios'
   },
 
