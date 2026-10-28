@@ -16,7 +16,7 @@ const CONFIG = {
     nome: 'Hotel Estilo Fino — Sistema de Gestão',
     nomeCurto: 'Estilo Fino',
     hotel: 'Hotel Estilo Fino',
-    versao: '1.0.1',
+    versao: '1.1.0',
     prefixoVoucher: 'HEF'
   },
 
@@ -80,13 +80,18 @@ const CONFIG = {
    * ----------------------------------------------------------------- */
   tabelas: {
     categorias:  ['nome', 'diaria', 'capacidade', 'descricao', 'ordem', 'ativo'],
+    contratantes:['nome', 'tipo', 'documento', 'contato', 'telefone', 'email', 'prazo_dias', 'comissao_pct',
+                  'desconto_pct', 'forma_padrao', 'tarifas', 'observacoes', 'ativo'],
+    produtos:    ['nome', 'grupo', 'codigo', 'unidade', 'preco', 'custo', 'controla_estoque', 'estoque',
+                  'estoque_em', 'estoque_minimo', 'ativo', 'ordem'],
     quartos:     ['numero', 'andar', 'categoria_id', 'status_manual', 'observacao', 'ativo', 'ordem'],
     hospedes:    ['nome', 'cpf', 'documento', 'nascimento', 'nacionalidade', 'telefone', 'email', 'cep',
                   'endereco', 'cidade', 'uf', 'empresa', 'placa', 'motivo', 'origem', 'observacoes'],
     reservas:    ['codigo', 'hospede_id', 'hospede_nome', 'documento', 'telefone', 'email', 'empresa',
                   'quarto_id', 'entrada', 'saida', 'adultos', 'criancas', 'regime', 'pagamento', 'diaria',
-                  'observacoes', 'status', 'checkin_em', 'checkout_em', 'voucher_status', 'voucher_enviado_em'],
-    consumos:    ['reserva_id', 'data', 'descricao', 'quantidade', 'valor'],
+                  'observacoes', 'status', 'checkin_em', 'checkout_em', 'voucher_status', 'voucher_enviado_em',
+                  'contratante_id', 'contratante_nome', 'contratante_tipo', 'prazo_dias', 'comissao_pct'],
+    consumos:    ['reserva_id', 'data', 'descricao', 'quantidade', 'valor', 'produto_id', 'grupo'],
     lancamentos: ['data', 'tipo', 'descricao', 'categoria', 'forma', 'valor', 'status', 'vencimento',
                   'reserva_id', 'quarto', 'pessoa'],
     parametros:  ['dados']
@@ -113,6 +118,22 @@ const CONFIG = {
 
   itensConsumo: ['Frigobar', 'Restaurante', 'Lavanderia', 'Café da manhã extra', 'Estacionamento', 'Taxa de early check-in', 'Taxa de late check-out', 'Outros'],
 
+  /* Grupos do cadastro de produtos (o frigobar é o primeiro). */
+  gruposProduto: ['Frigobar', 'Restaurante', 'Bar', 'Lavanderia', 'Serviços', 'Outros'],
+  unidades: ['un', 'lata', 'garrafa', 'pacote', 'porção', 'kg', 'serviço'],
+
+  /* Tipos de lançamento avulso na conta do quarto. */
+  lancamentosAvulsos: ['Diária extra', 'Pessoa adicional', 'Taxa de early check-in', 'Taxa de late check-out',
+                       'Café da manhã extra', 'Estacionamento', 'Lavanderia', 'Danos / avarias', 'Desconto', 'Outros'],
+
+  /* Tipos de contratação (cada contratante tem tarifa, prazo e comissão próprios). */
+  tiposContratante: {
+    direto:  'Hóspede direto (pessoa física)',
+    empresa: 'Empresa / convênio',
+    agencia: 'Agência de viagens',
+    ota:     'Site de reservas (Booking, Expedia…)',
+    outro:   'Outro'
+  },
   categoriasReceita: ['Hospedagem', 'Consumo', 'Eventos', 'Serviços', 'Outras receitas'],
   categoriasDespesa: ['Alimentos', 'Lavanderia', 'Manutenção', 'Utilidades (água, luz, internet)', 'Pessoal',
                       'Comissões', 'Impostos e taxas', 'Material de limpeza', 'Enxoval', 'Marketing', 'Outras despesas'],

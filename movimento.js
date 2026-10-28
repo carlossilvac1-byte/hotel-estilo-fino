@@ -126,17 +126,20 @@ const MOVIMENTO = (function () {
     const q = d.quartoPorId[r.quarto_id];
     let itens = '<div class="par"><span>Diárias (' + c.noites + ' × ' + brl(r.diaria) + ')</span><span>' + brl(c.diarias) + '</span></div>';
     c.consumos.sort((a, b) => a.data < b.data ? -1 : 1).forEach(x => {
-      itens += '<div class="par"><span>' + esc(x.descricao) + (DB.num(x.quantidade) > 1 ? ' (' + APP.numBR(x.quantidade) + ' × ' + brl(x.valor) + ')' : '') + ' · ' + dataCurta(x.data) + '</span><span>' + brl(DB.num(x.valor) * (DB.num(x.quantidade) || 1)) +
+      itens += '<div class="par"><span>' + (x.grupo && x.grupo !== 'Serviços' && x.descricao.indexOf(x.grupo) !== 0 ? esc(x.grupo) + ': ' : '') + esc(x.descricao) + (DB.num(x.quantidade) > 1 ? ' (' + APP.numBR(x.quantidade) + ' × ' + brl(x.valor) + ')' : '') + ' · ' + dataCurta(x.data) + '</span><span>' + brl(DB.num(x.valor) * (DB.num(x.quantidade) || 1)) +
         (edita && aberta ? ' <button type="button" class="btn-texto" style="min-height:0;padding:0 0 0 6px;text-decoration:none" data-del-cons="' + esc(x.id) + '" aria-label="Remover consumo">×</button>' : '') + '</span></div>';
     });
     const pagos = c.pagamentos.map(p => '<div class="par" style="font-size:13px"><span>' + esc(p.forma || 'Pagamento') + ' · ' + dataCurta(p.data) + (p.status === 'a_receber' ? ' (faturado)' : '') + '</span><span class="verde">- ' + brl(p.valor) + '</span></div>').join('');
     const formas = CONFIG.formasPagamento.filter(f => f !== 'Boleto');
-    const formaPadrao = /faturad/i.test(r.pagamento || '') ? 'Faturar à empresa' : (/cart[aã]o/i.test(r.pagamento || '') ? 'Cartão de crédito' : (/dinheiro/i.test(r.pagamento || '') ? 'Dinheiro' : 'Pix'));
+    const ct = d.contratantePorId[r.contratante_id];
+    const formaPadrao = (r.contratante_tipo && r.contratante_tipo !== 'direto' && ct && ct.forma_padrao) ? ct.forma_padrao :
+      /faturad/i.test(r.pagamento || '') ? 'Faturar à empresa' : (/cart[aã]o/i.test(r.pagamento || '') ? 'Cartão de crédito' : (/dinheiro/i.test(r.pagamento || '') ? 'Dinheiro' : 'Pix'));
     const periodo = dataCurta(r.entrada) + ' a ' + dataCurta(r.saida) + ' · ' + c.noites + ' noite(s)';
     box.innerHTML =
       '<div class="pilha" style="gap:2px"><span class="kl">' + (r.status === 'finalizada' ? 'Extrato da estadia' : 'Fechamento de conta') + '</span>' +
       '<span class="titulo-serif" style="font-size:26px">Quarto ' + esc(q ? q.numero : '—') + '</span>' +
       '<span class="kpi-sub" style="font-size:14px">' + esc(r.hospede_nome) + ' · ' + periodo + '</span>' +
+      '<span class="kpi-sub">' + esc(r.contratante_nome || 'Hóspede direto') + (DB.num(r.prazo_dias) && r.contratante_tipo !== 'direto' ? ' · faturamento ' + DB.num(r.prazo_dias) + ' dias' : '') + '</span>' +
       '<span class="kpi-sub">' + esc(r.codigo || '') + ' · ' + esc({ reservada: 'Reserva', hospedado: 'Hospedado', finalizada: 'Finalizada', cancelada: 'Cancelada' }[r.status]) + '</span></div>' +
       '<div class="pilha" style="gap:8px">' + itens +
       '<div class="par" style="color:#1F5E3F"><span style="color:#1F5E3F">Pagamentos recebidos</span><span>- ' + brl(c.pago) + '</span></div>' + pagos + '</div>' +
@@ -145,7 +148,7 @@ const MOVIMENTO = (function () {
       (edita && r.status === 'hospedado' ?
         '<label class="fld">Forma de pagamento<select id="mv-forma">' + opcoes(formas, formaPadrao) + '</select></label>' +
         '<button type="button" class="btn btn-ouro" style="min-height:48px;font-size:15px" id="mv-checkout">Receber e finalizar check-out</button>' +
-        '<div class="grade-botoes"><button type="button" class="btn btn-peq" id="mv-consumo">Lançar consumo</button><button type="button" class="btn btn-peq" id="mv-pagamento">Registrar pagamento</button>' +
+        '<div class="grade-botoes"><button type="button" class="btn btn-peq" id="mv-consumo">Lançar no quarto (frigobar, taxas)</button><button type="button" class="btn btn-peq" id="mv-pagamento">Registrar pagamento</button>' +
         '<button type="button" class="btn btn-peq" id="mv-estadia">Prorrogar / trocar quarto</button><button type="button" class="btn btn-peq" id="mv-extrato">Imprimir extrato</button></div>' : '') +
       (edita && r.status === 'reservada' ?
         '<button type="button" class="btn btn-escuro" style="min-height:48px" id="mv-fazer-checkin">Fazer check-in</button>' +
@@ -155,7 +158,7 @@ const MOVIMENTO = (function () {
 
     const go = (id, fn) => { const b = $(id, box); if (b) b.onclick = fn; };
     go('#mv-checkout', () => checkout(d, r));
-    go('#mv-consumo', () => consumo(d, r));
+    go('#mv-consumo', () => APP.ir('tela-lancar', { reserva: r.id }));
     go('#mv-pagamento', () => pagamento(d, r));
     go('#mv-estadia', () => alterarEstadia(d, r));
     go('#mv-extrato', () => extrato(d, r));
@@ -183,6 +186,24 @@ const MOVIMENTO = (function () {
     });
   }
 
+  /* ---------------- Contratantes (tarifa, prazo e comissão) ---------------- */
+  function opcoesContratante(d, atual) {
+    return d.contratantes.filter(c => c.ativo !== false || c.id === atual)
+      .map(c => ({ v: c.id, t: c.nome + (c.tipo !== 'direto' ? ' · ' + (CONFIG.tiposContratante[c.tipo] || '') : '') }));
+  }
+  /** Ao trocar quarto ou contratante, sugere a diária da tabela. */
+  function ligarTarifa(d, corpo) {
+    const selQ = $('[name="quarto_id"]', corpo), selC = $('[name="contratante_id"]', corpo), dia = $('[name="diaria"]', corpo);
+    const info = $('[data-info-contratante]', corpo);
+    const aplicar = () => {
+      if (selQ.value) { const v = DB.tarifa(d, selC.value, selQ.value); if (v) dia.value = APP.numBR(v, 2); }
+      const ct = d.contratantePorId[selC.value];
+      if (info) info.textContent = ct && ct.tipo !== 'direto' ? 'Faturamento em ' + DB.num(ct.prazo_dias) + ' dia(s)' + (DB.num(ct.comissao_pct) ? ' · comissão ' + APP.numBR(ct.comissao_pct, 1) + '%' : '') + (ct.forma_padrao ? ' · ' + ct.forma_padrao : '') : '';
+    };
+    selQ.addEventListener('change', aplicar); selC.addEventListener('change', aplicar);
+    return aplicar;
+  }
+
   /* ---------------- Check-in de reserva ---------------- */
   function checkin(d, r) {
     const hoje = DB.hoje();
@@ -199,8 +220,9 @@ const MOVIMENTO = (function () {
       '<label class="fld">Saída<input type="date" name="saida" value="' + r.saida + '"></label>' +
       '<label class="fld">Adultos<input type="number" name="adultos" min="1" value="' + (DB.num(r.adultos) || 1) + '"></label>' +
       '<label class="fld">Crianças<input type="number" name="criancas" min="0" value="' + DB.num(r.criancas) + '"></label>' +
+      '<label class="fld">Contratação<select name="contratante_id">' + opcoes(opcoesContratante(d, r.contratante_id || 'direto'), r.contratante_id || 'direto') + '</select><span class="dica" data-info-contratante></span></label>' +
       '<label class="fld">Diária (R$)<input name="diaria" data-dinheiro inputmode="decimal" value="' + APP.numBR(r.diaria, 2) + '"></label></div>';
-    APP.janela({
+    const janCk = APP.janela({
       titulo: 'Check-in', html: html,
       botoes: [{ rotulo: 'Cancelar' }, {
         rotulo: 'Confirmar check-in', classe: 'btn-escuro', acao: async (c) => {
@@ -218,7 +240,7 @@ const MOVIMENTO = (function () {
           await DB.salvar('reservas', Object.assign({}, r, {
             quarto_id: v.quarto_id, entrada: v.entrada, saida: v.saida, adultos: parseInt(v.adultos, 10) || 1, criancas: parseInt(v.criancas, 10) || 0,
             diaria: APP.lerValor(v.diaria), status: 'hospedado', checkin_em: DB.agoraISO()
-          }));
+          }, DB.dadosContratante(d, v.contratante_id)));
           if (q.status_manual !== 'liv') await DB.salvar('quartos', Object.assign({}, q, { status_manual: 'liv' }));
           st.conta = r.id; st.aba = 'casa';
           APP.aviso('Check-in de ' + r.hospede_nome + ' no quarto ' + q.numero + ' realizado.', 'sucesso');
@@ -226,6 +248,10 @@ const MOVIMENTO = (function () {
         }
       }]
     });
+    // Diária só é sugerida ao trocar quarto/contratante (mantém o valor negociado na reserva)
+    ligarTarifa(d, janCk.corpo);
+    const infoCk = $('[data-info-contratante]', janCk.corpo); const ctCk = d.contratantePorId[r.contratante_id];
+    if (infoCk && ctCk && ctCk.tipo !== 'direto') infoCk.textContent = 'Faturamento em ' + DB.num(ctCk.prazo_dias) + ' dia(s)' + (DB.num(ctCk.comissao_pct) ? ' · comissão ' + APP.numBR(ctCk.comissao_pct, 1) + '%' : '');
   }
 
   /* ---------------- Walk-in (sem reserva) ---------------- */
@@ -234,8 +260,8 @@ const MOVIMENTO = (function () {
     const h = opc.hospede ? d.hospedes.find(x => x.id === opc.hospede) : null;
     const saida = DB.somarDias(hoje, 1);
     const html =
-      '<label class="fld">Hóspede<input name="hospede_nome" list="mv-hosp" value="' + esc(h ? h.nome : '') + '" placeholder="Digite para buscar ou cadastrar"></label>' +
-      '<datalist id="mv-hosp">' + d.hospedes.map(x => '<option value="' + esc(x.nome) + '">').join('') + '</datalist>' +
+      '<input type="hidden" name="hospede_id" value="' + esc(h ? h.id : '') + '">' +
+      '<label class="fld">Hóspede<input name="hospede_nome" value="' + esc(h ? h.nome : '') + '" placeholder="Busque por CPF, nome ou celular — ou digite um novo nome"><span class="dica" id="mv-dica-hosp">' + (h ? 'Hóspede cadastrado' : '') + '</span></label>' +
       '<div class="grade-campos">' +
       '<label class="fld">Documento (CPF / RG)<input name="documento" value="' + esc(h ? (h.cpf || h.documento || '') : '') + '"></label>' +
       '<label class="fld">Telefone<input name="telefone" type="tel" data-mascara="tel" value="' + esc(h ? (h.telefone || '') : '') + '"></label>' +
@@ -243,6 +269,7 @@ const MOVIMENTO = (function () {
       '<label class="fld">Saída<input type="date" name="saida" value="' + saida + '" min="' + DB.somarDias(hoje, 1) + '"></label>' +
       '<label class="fld">Adultos<input type="number" name="adultos" min="1" value="1"></label>' +
       '<label class="fld">Crianças<input type="number" name="criancas" min="0" value="0"></label>' +
+      '<label class="fld">Contratação<select name="contratante_id">' + opcoes(opcoesContratante(d, 'direto'), 'direto') + '</select><span class="dica" data-info-contratante></span></label>' +
       '<label class="fld">Diária (R$)<input name="diaria" data-dinheiro inputmode="decimal" placeholder="0,00"></label>' +
       '<label class="fld">Regime<select name="regime">' + opcoes(CONFIG.regimes, CONFIG.regimes[0]) + '</select></label></div>' +
       '<label class="fld">Pagamento<select name="pagamento">' + opcoes(CONFIG.pagamentosReserva.map(p => p.replace('— pago antecipado', '— no check-in')).filter((v, i, a) => a.indexOf(v) === i), 'Pix — no check-in') + '</select></label>';
@@ -258,7 +285,16 @@ const MOVIMENTO = (function () {
           if (conf.length) throw new Error('Quarto reservado no período para ' + conf[0].hospede_nome + ' (' + dataCurta(conf[0].entrada) + ' a ' + dataCurta(conf[0].saida) + ').');
           const diaria = APP.lerValor(v.diaria);
           if (!diaria) { const ok = await APP.confirmar('Diária zerada', 'Fazer o check-in sem valor de diária?', { rotuloOk: 'Confirmar' }); if (!ok.ok) return false; }
-          let hosp = d.hospedes.find(x => String(x.nome).toLowerCase() === v.hospede_nome.toLowerCase());
+          let hosp = v.hospede_id ? d.hospedes.find(x => x.id === v.hospede_id) : null;
+          if (hosp && String(hosp.nome).toLowerCase() !== v.hospede_nome.toLowerCase()) hosp = null;
+          const digDoc = APP.soDigitos(v.documento);
+          if (!hosp && digDoc.length >= 5) hosp = d.hospedes.find(x => APP.soDigitos(x.cpf) === digDoc || APP.soDigitos(x.documento) === digDoc);
+          if (!hosp) hosp = d.hospedes.find(x => String(x.nome).toLowerCase() === v.hospede_nome.toLowerCase());
+          if (hosp) {
+            const ativa = d.reservas.find(x => x.status === 'hospedado' && x.hospede_id === hosp.id);
+            if (ativa) { const ok = await APP.confirmar('Hóspede já hospedado', hosp.nome + ' já está no quarto ' + (d.quartoPorId[ativa.quarto_id] || {}).numero + '. Abrir outro check-in mesmo assim?', { rotuloOk: 'Continuar' }); if (!ok.ok) return false; }
+            if (!hosp.telefone && v.telefone) hosp = await DB.salvar('hospedes', Object.assign({}, hosp, { telefone: v.telefone }));
+          }
           if (!hosp) {
             const dig = APP.soDigitos(v.documento);
             const ehCpf = dig.length === 11 && APP.cpfValido(dig);
@@ -269,7 +305,8 @@ const MOVIMENTO = (function () {
             codigo: DB.codigoVoucher(), hospede_id: hosp.id, hospede_nome: hosp.nome, documento: v.documento || hosp.cpf || hosp.documento, telefone: v.telefone || hosp.telefone,
             email: hosp.email, empresa: hosp.empresa, quarto_id: v.quarto_id, entrada: hoje, saida: v.saida,
             adultos: parseInt(v.adultos, 10) || 1, criancas: parseInt(v.criancas, 10) || 0, regime: v.regime, pagamento: v.pagamento,
-            diaria: diaria, status: 'hospedado', checkin_em: DB.agoraISO(), voucher_status: 'aguardando'
+            diaria: diaria, status: 'hospedado', checkin_em: DB.agoraISO(), voucher_status: 'aguardando',
+            ...DB.dadosContratante(d, v.contratante_id)
           });
           if (q.status_manual !== 'liv') await DB.salvar('quartos', Object.assign({}, q, { status_manual: 'liv' }));
           st.conta = r.id; st.aba = 'casa'; st.dia = hoje;
@@ -278,38 +315,20 @@ const MOVIMENTO = (function () {
         }
       }]
     });
-    // Diária automática pela categoria do quarto
-    const sel = $('[name="quarto_id"]', jan.corpo);
-    sel.onchange = () => {
-      const q = d.quartoPorId[sel.value]; const cat = q && d.catPorId[q.categoria_id];
-      if (cat) $('[name="diaria"]', jan.corpo).value = APP.numBR(cat.diaria, 2);
-    };
-    if (opc.quarto) sel.onchange();
+    // Diária automática pela tabela do contratante e categoria do quarto
+    const aplicarTarifa = ligarTarifa(d, jan.corpo);
+    if (opc.quarto) aplicarTarifa();
+    // Hóspede: busca por CPF, nome ou celular
     const nome = $('[name="hospede_nome"]', jan.corpo);
-    nome.onchange = () => {
-      const x = d.hospedes.find(k => String(k.nome).toLowerCase() === nome.value.trim().toLowerCase());
-      if (x) { $('[name="documento"]', jan.corpo).value = x.cpf || x.documento || ''; $('[name="telefone"]', jan.corpo).value = x.telefone || ''; }
+    const preencher = (x) => {
+      $('[name="hospede_id"]', jan.corpo).value = x ? x.id : '';
+      $('#mv-dica-hosp').textContent = x ? 'Hóspede cadastrado' + (x.cidade ? ' · ' + x.cidade : '') : (nome.value.trim() ? 'Novo hóspede: será cadastrado no check-in.' : '');
+      if (x) { nome.value = x.nome; $('[name="documento"]', jan.corpo).value = x.cpf || x.documento || ''; $('[name="telefone"]', jan.corpo).value = x.telefone || ''; }
     };
-  }
-
-  /* ---------------- Consumo ---------------- */
-  function consumo(d, r) {
-    APP.janela({
-      titulo: 'Lançar consumo', html:
-        '<div class="grade-campos"><label class="fld">Item<select name="item">' + opcoes(CONFIG.itensConsumo, CONFIG.itensConsumo[0]) + '</select></label>' +
-        '<label class="fld">Descrição (opcional)<input name="desc" maxlength="80" placeholder="Ex.: 2 águas, 1 refrigerante"></label>' +
-        '<label class="fld">Quantidade<input type="number" name="qtd" min="1" value="1"></label>' +
-        '<label class="fld">Valor unitário (R$)<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>' +
-        '<label class="fld">Data<input type="date" name="data" value="' + DB.hoje() + '"></label></div>',
-      botoes: [{ rotulo: 'Cancelar' }, { rotulo: 'Lançar na conta', classe: 'btn-escuro', acao: async (c) => {
-        const v = APP.lerForm(c);
-        const valor = APP.lerValor(v.valor);
-        if (valor <= 0) throw new Error('Informe o valor.');
-        const qtd = Math.max(1, parseInt(v.qtd, 10) || 1);
-        await DB.salvar('consumos', { reserva_id: r.id, data: v.data || DB.hoje(), descricao: v.item + (v.desc ? ' — ' + v.desc : ''), quantidade: qtd, valor: valor });
-        APP.aviso('Consumo lançado: ' + brl(valor * qtd) + '.', 'sucesso');
-        montar();
-      } }]
+    LANCAR.ligarBuscaHospede(d, nome, preencher);
+    nome.addEventListener('change', () => {
+      const x = d.hospedes.find(k => String(k.nome).toLowerCase() === nome.value.trim().toLowerCase());
+      preencher(x || null);
     });
   }
 
@@ -339,8 +358,26 @@ const MOVIMENTO = (function () {
     return DB.salvar('lancamentos', {
       data: data, tipo: 'receita', descricao: rotulo + ' — quarto ' + (q ? q.numero : '') + ' · ' + r.hospede_nome + ' (' + r.codigo + ')',
       categoria: 'Hospedagem', forma: forma, valor: Math.round(valor * 100) / 100, status: faturar ? 'a_receber' : 'recebido',
-      vencimento: faturar ? DB.somarDias(data, 30) : null, reserva_id: r.id, quarto: q ? q.numero : null, pessoa: faturar ? (r.empresa || r.hospede_nome) : r.hospede_nome
+      vencimento: faturar ? DB.somarDias(data, prazoFaturamento(r)) : null, reserva_id: r.id, quarto: q ? q.numero : null,
+      pessoa: faturar ? ((r.contratante_tipo && r.contratante_tipo !== 'direto' ? r.contratante_nome : null) || r.empresa || r.hospede_nome) : r.hospede_nome
     });
+  }
+  function prazoFaturamento(r) { return (r.contratante_tipo && r.contratante_tipo !== 'direto' && DB.num(r.prazo_dias) > 0) ? DB.num(r.prazo_dias) : 30; }
+
+  /** Comissão da agência/site: despesa a pagar sobre as diárias (uma por estadia). */
+  async function lancarComissao(d, r) {
+    const pct = DB.num(r.comissao_pct);
+    if (!(pct > 0) || r.contratante_tipo === 'direto') return null;
+    const ja = d.lancamentos.find(l => l.reserva_id === r.id && l.tipo === 'despesa' && l.categoria === 'Comissões');
+    const valor = Math.round(DB.conta(d, r).diarias * pct) / 100;
+    if (!(valor > 0)) return null;
+    const q = d.quartoPorId[r.quarto_id];
+    const hoje = DB.hoje();
+    return DB.salvar('lancamentos', Object.assign({}, ja || {}, {
+      data: hoje, tipo: 'despesa', descricao: 'Comissão ' + APP.numBR(pct, 1) + '% — ' + r.contratante_nome + ' · ' + r.hospede_nome + ' (' + r.codigo + ')',
+      categoria: 'Comissões', forma: 'Transferência', valor: valor, status: 'agendado', vencimento: DB.somarDias(hoje, prazoFaturamento(r)),
+      reserva_id: r.id, quarto: q ? q.numero : null, pessoa: r.contratante_nome
+    }));
   }
 
   /* ---------------- Prorrogar / trocar quarto ---------------- */
@@ -385,11 +422,13 @@ const MOVIMENTO = (function () {
     }
     const c = DB.conta(d, r);
     const msg = c.saldo > 0.009
-      ? 'Receber ' + brl(c.saldo) + ' via ' + forma + (forma === 'Faturar à empresa' ? ' (fica em Contas a receber, vencimento em 30 dias)' : '') + ' e finalizar a estadia de ' + r.hospede_nome + '?'
+      ? 'Receber ' + brl(c.saldo) + ' via ' + forma + (forma === 'Faturar à empresa' ? ' (fica em Contas a receber de ' + ((r.contratante_tipo !== 'direto' && r.contratante_nome) || r.empresa || r.hospede_nome) + ', vencimento em ' + prazoFaturamento(r) + ' dias)' : '') + ' e finalizar a estadia de ' + r.hospede_nome + '?'
       : (c.saldo < -0.009 ? 'O hóspede tem crédito de ' + brl(-c.saldo) + ' (pagou a mais). Faça a devolução e registre-a no Financeiro. Finalizar a estadia?' : 'Conta quitada. Finalizar a estadia de ' + r.hospede_nome + '?');
     const ok = await APP.confirmar('Finalizar check-out', msg, { rotuloOk: 'Finalizar check-out' });
     if (!ok.ok) return;
     if (c.saldo > 0.009) await lancarRecebimento(d, r, c.saldo, forma, hoje, 'Check-out');
+    const com = await lancarComissao(d, r);
+    if (com) APP.aviso('Comissão de ' + brl(com.valor) + ' (' + r.contratante_nome + ') lançada em Contas a pagar.', 'alerta', 8);
     await DB.salvar('reservas', Object.assign({}, r, { status: 'finalizada', checkout_em: DB.agoraISO() }));
     const q = d.quartoPorId[r.quarto_id];
     if (q) await DB.salvar('quartos', Object.assign({}, q, { status_manual: 'lmp' }));

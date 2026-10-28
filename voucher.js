@@ -15,13 +15,12 @@ const VOUCHER = (function () {
       id: null, codigo: null, hospede_id: null, hospede_nome: '', documento: '', telefone: '', email: '', empresa: '',
       quarto_id: st.quartoInicial || '', entrada: hoje, saida: DB.somarDias(hoje, 1), adultos: 2, criancas: 0,
       regime: CONFIG.regimes[0], pagamento: CONFIG.pagamentosReserva[0], diaria: '', observacoes: '', status: 'reservada',
-      voucher_status: 'aguardando'
+      voucher_status: 'aguardando', contratante_id: 'direto'
     };
   }
 
-  function diariaDoQuarto(d, quartoId) {
-    const q = d.quartoPorId[quartoId]; const c = q && d.catPorId[q.categoria_id];
-    return c ? DB.num(c.diaria) : 0;
+  function diariaDoQuarto(d, quartoId, contratanteId) {
+    return DB.tarifa(d, contratanteId || 'direto', quartoId);
   }
 
   /** Valores atuais do formulário, já tipados. */
@@ -45,7 +44,8 @@ const VOUCHER = (function () {
       quarto: q ? q.numero : '—', tipo: c ? c.nome : 'Categoria a definir',
       entrada: f.entrada, saida: f.saida, noites: n,
       pessoas: a + (a === 1 ? ' adulto' : ' adultos') + (cr ? ' + ' + cr + (cr === 1 ? ' criança' : ' crianças') : ''),
-      regime: f.regime, pagamento: f.pagamento, diaria: f.diaria, total: f.diaria * n, obs: f.observacoes,
+      regime: f.regime, diaria: f.diaria, total: f.diaria * n, obs: f.observacoes,
+      pagamento: f.pagamento + (f.contratante_id && f.contratante_id !== 'direto' && d.contratantePorId[f.contratante_id] ? ' · via ' + d.contratantePorId[f.contratante_id].nome : ''),
       status: reg ? reg.status : 'reservada', hotel: d.hotel
     };
   }
@@ -102,7 +102,9 @@ const VOUCHER = (function () {
       const h = d.hospedes.find(x => x.id === st.hospedeInicial);
       if (h) Object.assign(f, { hospede_id: h.id, hospede_nome: h.nome, documento: h.cpf || h.documento || '', telefone: h.telefone || '', email: h.email || '', empresa: h.empresa || '' });
     }
-    if (!reg && f.quarto_id && !f.diaria) f.diaria = diariaDoQuarto(d, f.quarto_id);
+    if (!reg && f.quarto_id && !f.diaria) f.diaria = diariaDoQuarto(d, f.quarto_id, f.contratante_id);
+    const ctOps = d.contratantes.filter(c => c.ativo !== false || c.id === f.contratante_id)
+      .map(c => ({ v: c.id, t: c.nome + (c.tipo !== 'direto' ? ' · ' + (CONFIG.tiposContratante[c.tipo] || '') : '') }));
     const editavel = AUTH.podeEditar('voucher') && (!reg || reg.status === 'reservada');
     const dis = editavel ? '' : ' disabled';
 
@@ -117,9 +119,8 @@ const VOUCHER = (function () {
       '<form class="card pilha" id="vc-form" aria-label="Dados da reserva" style="flex:1 1 420px;min-width:0;gap:14px" autocomplete="off">' +
       '<div class="linha-topo"><h2>Dados da reserva</h2>' + (reg && reg.status !== 'reservada' ? '<span class="badge b-neutro">' + esc({ hospedado: 'Hóspede na casa', finalizada: 'Estadia concluída', cancelada: 'Cancelada' }[reg.status] || reg.status) + '</span>' : '') + '</div>' +
       '<input type="hidden" name="hospede_id" value="' + esc(f.hospede_id || '') + '">' +
-      '<label class="fld">Hóspede principal<input name="hospede_nome" list="vc-lista-hospedes" value="' + esc(f.hospede_nome) + '" placeholder="Digite para buscar ou cadastrar"' + dis + '>' +
+      '<label class="fld">Hóspede principal<input name="hospede_nome" value="' + esc(f.hospede_nome) + '" placeholder="Busque por CPF, nome ou celular — ou digite um novo nome"' + dis + '>' +
       '<span class="dica" id="vc-dica-hosp"></span></label>' +
-      '<datalist id="vc-lista-hospedes">' + d.hospedes.map(h => '<option value="' + esc(h.nome) + '">' + esc((h.cidade || '') + (h.cpf ? ' · CPF ' + HOSPEDES.mascararCPF(h.cpf) : '')) + '</option>').join('') + '</datalist>' +
       '<div class="grade-campos" style="grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))">' +
       '<label class="fld">Documento (CPF / RG)<input name="documento" value="' + esc(f.documento) + '"' + dis + '></label>' +
       '<label class="fld">Telefone / WhatsApp<input name="telefone" type="tel" data-mascara="tel" value="' + esc(f.telefone) + '"' + dis + '></label>' +
@@ -130,7 +131,8 @@ const VOUCHER = (function () {
       '<label class="fld">Adultos<input type="number" name="adultos" min="1" max="10" value="' + esc(f.adultos) + '"' + dis + '></label>' +
       '<label class="fld">Crianças<input type="number" name="criancas" min="0" max="10" value="' + esc(f.criancas) + '"' + dis + '></label>' +
       '</div>' +
-      '<div class="grade-campos"><label class="fld">Diária (R$)<input name="diaria" inputmode="decimal" data-dinheiro value="' + (f.diaria !== '' ? esc(APP.numBR(f.diaria, 2)) : '') + '" placeholder="0,00"' + dis + '></label>' +
+      '<div class="grade-campos"><label class="fld">Contratação<select name="contratante_id"' + dis + '>' + opcoes(ctOps, f.contratante_id || 'direto') + '</select><span class="dica" id="vc-dica-ct"></span></label>' +
+      '<label class="fld">Diária (R$)<input name="diaria" inputmode="decimal" data-dinheiro value="' + (f.diaria !== '' ? esc(APP.numBR(f.diaria, 2)) : '') + '" placeholder="0,00"' + dis + '></label>' +
       '<label class="fld">Regime<select name="regime"' + dis + '>' + opcoes(CONFIG.regimes, f.regime) + '</select></label></div>' +
       '<label class="fld">Pagamento<select name="pagamento"' + dis + '>' + opcoes(CONFIG.pagamentosReserva, f.pagamento) + '</select></label>' +
       '<label class="fld">Observações no voucher<textarea name="observacoes" maxlength="400"' + dis + '>' + esc(f.observacoes) + '</textarea></label>' +
@@ -174,16 +176,37 @@ const VOUCHER = (function () {
         if (e1.value && (!s1.value || s1.value <= e1.value)) s1.value = DB.somarDias(e1.value, 1);
         desenharQuartos();
       }
-      if (e.target.name === 'quarto_id') {
-        const dia = diariaDoQuarto(d, e.target.value);
+      if (e.target.name === 'quarto_id' || e.target.name === 'contratante_id') {
+        const dia = diariaDoQuarto(d, $('[name="quarto_id"]', form).value, $('[name="contratante_id"]', form).value);
         if (dia) $('[name="diaria"]', form).value = APP.numBR(dia, 2);
+      }
+      if (e.target.name === 'contratante_id') {
+        const ct = d.contratantePorId[e.target.value];
+        const pg = $('[name="pagamento"]', form);
+        if (ct && (ct.tipo === 'empresa' || ct.tipo === 'agencia') && /Faturar/.test(ct.forma_padrao || 'Faturar')) pg.value = 'Faturado à empresa';
+        dicaContratante();
       }
       atualizar();
     });
+    const dicaContratante = () => {
+      const ct = d.contratantePorId[$('[name="contratante_id"]', form).value];
+      $('#vc-dica-ct').textContent = ct && ct.tipo !== 'direto' ? 'Prazo ' + DB.num(ct.prazo_dias) + ' dia(s)' + (DB.num(ct.comissao_pct) ? ' · comissão ' + APP.numBR(ct.comissao_pct, 1) + '%' : '') : 'Tarifa de balcão';
+    };
+    dicaContratante();
     // Hóspede: ao escolher da lista, preenche documento e contatos
     const nomeInp = $('[name="hospede_nome"]', form);
+    if (editavel) LANCAR.ligarBuscaHospede(d, nomeInp, (h) => {
+      nomeInp.value = h.nome;
+      $('[name="hospede_id"]', form).value = h.id;
+      const set = (n, v) => { const i = $('[name="' + n + '"]', form); if (i) i.value = v || ''; };
+      set('documento', h.cpf || h.documento); set('telefone', h.telefone); set('email', h.email);
+      $('#vc-dica-hosp').textContent = 'Hóspede cadastrado' + (h.cidade ? ' · ' + h.cidade : '');
+      atualizar();
+    });
     const ligarHospede = () => {
-      const h = d.hospedes.find(x => String(x.nome).toLowerCase() === nomeInp.value.trim().toLowerCase());
+      const atualId = $('[name="hospede_id"]', form).value;
+      const h = (atualId && d.hospedes.find(x => x.id === atualId && String(x.nome).toLowerCase() === nomeInp.value.trim().toLowerCase())) ||
+        d.hospedes.find(x => String(x.nome).toLowerCase() === nomeInp.value.trim().toLowerCase());
       $('[name="hospede_id"]', form).value = h ? h.id : '';
       $('#vc-dica-hosp').textContent = nomeInp.value.trim() ? (h ? 'Hóspede cadastrado' + (h.cidade ? ' · ' + h.cidade : '') : 'Novo hóspede: será cadastrado ao salvar a reserva.') : '';
       if (h) {
@@ -280,7 +303,7 @@ const VOUCHER = (function () {
       empresa: (h && h.empresa) || (reg && reg.empresa) || null,
       quarto_id: f.quarto_id, entrada: f.entrada, saida: f.saida, adultos: f.adultos, criancas: f.criancas,
       regime: f.regime, pagamento: f.pagamento, diaria: f.diaria, observacoes: f.observacoes
-    });
+    }, DB.dadosContratante(d, f.contratante_id));
     if (!reg) { novo.codigo = DB.codigoVoucher(); novo.status = 'reservada'; novo.voucher_status = 'aguardando'; }
     const salvo = await DB.salvar('reservas', novo);
     APP.aviso('Reserva ' + salvo.codigo + ' gravada.', 'sucesso');
@@ -291,7 +314,7 @@ const VOUCHER = (function () {
   async function garantirSalvo(d, reg) {
     if (!AUTH.podeEditar('voucher') || (reg && reg.status !== 'reservada')) return reg;
     const f = lerFormulario();
-    const mudou = !reg || ['hospede_nome', 'documento', 'telefone', 'email', 'quarto_id', 'entrada', 'saida', 'regime', 'pagamento', 'observacoes']
+    const mudou = !reg || ['hospede_nome', 'documento', 'telefone', 'email', 'quarto_id', 'entrada', 'saida', 'regime', 'pagamento', 'observacoes', 'contratante_id']
       .some(k => String(reg[k] || '') !== String(f[k] || '')) || DB.num(reg.adultos) !== f.adultos || DB.num(reg.criancas) !== f.criancas || DB.num(reg.diaria) !== f.diaria;
     if (!mudou) return reg;
     const r = await salvar(d, reg);

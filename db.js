@@ -23,6 +23,11 @@ const DB = (function () {
     lancamentos: 'id, sync, data, reserva_id',
     parametros: 'id, sync'
   });
+  // v2: frigobar / produtos e contratantes (tarifas por tipo de contratação)
+  db.version(2).stores({
+    contratantes: 'id, sync',
+    produtos: 'id, sync, grupo'
+  });
 
   const TABELAS = Object.keys(CONFIG.tabelas);
   const LOCAIS = ['sync', 'erro_sync', 'tentativas'];
@@ -186,7 +191,7 @@ const DB = (function () {
     const local = await db[tabela].get(linha.id);
     if (local && local.sync !== 'sincronizado' && local.atualizado_em > linha.atualizado_em) return false;
     const reg = normalizar(tabela, linha);
-    ['diaria', 'valor', 'quantidade'].forEach(c => { if (reg[c] !== undefined && reg[c] !== null) reg[c] = num(reg[c]); });
+    ['diaria', 'valor', 'quantidade', 'preco', 'custo', 'estoque', 'estoque_minimo', 'prazo_dias', 'comissao_pct', 'desconto_pct'].forEach(c => { if (reg[c] !== undefined && reg[c] !== null) reg[c] = num(reg[c]); });
     reg.sync = 'sincronizado'; reg.erro_sync = null; reg.tentativas = 0;
     await db[tabela].put(reg);
     return true;
@@ -209,10 +214,17 @@ const DB = (function () {
       }
       await db.quartos.bulkPut(l);
     }
+    if (!(await db.contratantes.get('direto'))) {
+      await db.contratantes.put(Object.assign(contratanteDireto(), { criado_em: ANTIGO, atualizado_em: ANTIGO, excluido: false, sync: 'sincronizado' }));
+    }
     if (!(await db.parametros.get('hotel'))) {
       await db.parametros.put({ id: 'hotel', dados: parametrosPadrao(), criado_em: ANTIGO, atualizado_em: ANTIGO,
                                 excluido: false, sync: 'sincronizado' });
     }
+  }
+  function contratanteDireto() {
+    return { id: 'direto', nome: 'Hóspede direto (balcão)', tipo: 'direto', documento: null, contato: null, telefone: null, email: null,
+             prazo_dias: 0, comissao_pct: 0, desconto_pct: 0, forma_padrao: 'Pix', tarifas: {}, observacoes: null, ativo: true };
   }
   function parametrosPadrao() {
     return {
@@ -232,15 +244,22 @@ const DB = (function () {
 
   /** Carrega tudo o que as telas costumam cruzar, de uma vez. */
   async function carregarTudo() {
-    const [categorias, quartos, hospedes, reservas, consumos, lancamentos, h] = await Promise.all([
+    const [categorias, quartos, hospedes, reservas, consumos, lancamentos, h, contratantes, produtos] = await Promise.all([
       listar('categorias'), listar('quartos'), listar('hospedes'), listar('reservas'),
-      listar('consumos'), listar('lancamentos'), hotel()
+      listar('consumos'), listar('lancamentos'), hotel(), listar('contratantes'), listar('produtos')
     ]);
+    if (!contratantes.find(c => c.id === 'direto')) contratantes.unshift(contratanteDireto());
+    contratantes.sort((a, b) => (a.id === 'direto' ? -1 : b.id === 'direto' ? 1 : 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    produtos.sort((a, b) => CONFIG.gruposProduto.indexOf(a.grupo) - CONFIG.gruposProduto.indexOf(b.grupo) ||
+      (a.ordem || 0) - (b.ordem || 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    const contratantePorId = {}; contratantes.forEach(c => { contratantePorId[c.id] = c; });
+    const produtoPorId = {}; produtos.forEach(p => { produtoPorId[p.id] = p; });
     categorias.sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
     quartos.sort(ordenarQuartos);
     const catPorId = {}; categorias.forEach(c => { catPorId[c.id] = c; });
     const quartoPorId = {}; quartos.forEach(q => { quartoPorId[q.id] = q; });
-    return { categorias, quartos, hospedes, reservas, consumos, lancamentos, hotel: h, catPorId, quartoPorId };
+    return { categorias, quartos, hospedes, reservas, consumos, lancamentos, hotel: h, catPorId, quartoPorId,
+             contratantes, contratantePorId, produtos, produtoPorId };
   }
 
   function ordenarQuartos(a, b) {
@@ -270,6 +289,39 @@ const DB = (function () {
     if (q.status_manual === 'lmp' || q.status_manual === 'mnt') return q.status_manual;
     if (reservaDoDia(dados, q.id)) return 'res';
     return 'liv';
+  }
+
+  /**
+   * Tarifa da diária para um contratante e um quarto:
+   * 1) tarifa negociada do contratante para a categoria do quarto;
+   * 2) senão, diária de balcão da categoria com o desconto/acréscimo (%) do contratante.
+   */
+  function tarifa(dados, contratanteId, quartoId) {
+    const q = dados.quartoPorId[quartoId]; const cat = q && dados.catPorId[q.categoria_id];
+    const ct = dados.contratantePorId[contratanteId || 'direto'];
+    if (cat && ct && ct.tarifas && num(ct.tarifas[cat.id]) > 0) return num(ct.tarifas[cat.id]);
+    const base = cat ? num(cat.diaria) : 0;
+    const desc = ct ? num(ct.desconto_pct) : 0;
+    return Math.round(base * (1 - desc / 100) * 100) / 100;
+  }
+
+  /** Dados do contratante gravados na reserva (cópia: mudar a tabela depois não altera reservas antigas). */
+  function dadosContratante(dados, contratanteId) {
+    const ct = dados.contratantePorId[contratanteId || 'direto'] || contratanteDireto();
+    return { contratante_id: ct.id, contratante_nome: ct.nome, contratante_tipo: ct.tipo, prazo_dias: num(ct.prazo_dias), comissao_pct: num(ct.comissao_pct) };
+  }
+
+  /**
+   * Saldo de estoque do produto: última contagem/reposição (estoque em estoque_em)
+   * menos o que foi lançado nas contas depois dela. Não depende de gravar o
+   * produto a cada venda (vários aparelhos lançando ao mesmo tempo não conflitam).
+   */
+  function saldoProduto(dados, p) {
+    if (!p || p.controla_estoque === false) return null;
+    const desde = new Date(p.estoque_em || 0).getTime();
+    const vendido = dados.consumos.filter(c => c.produto_id === p.id && new Date(c.criado_em).getTime() > desde)
+      .reduce((s, c) => s + (num(c.quantidade) || 1), 0);
+    return num(p.estoque) - vendido;
   }
 
   function noites(r) { return Math.max(0, diasEntre(r.entrada, r.saida)); }
@@ -354,7 +406,7 @@ const DB = (function () {
     TABELAS: TABELAS, salvar, excluir, obter, listar, aoMudar, notificar,
     listarPendentes, contarPendentes, paraEnvio, marcarEnviado, marcarErro, receber,
     cargaInicial, hotel, parametrosPadrao, carregarTudo, ordenarQuartos,
-    estadiaAtiva, reservaDoDia, statusQuarto, noites, conflitos, conta, noitesNoPeriodo, vendidas, codigoVoucher,
+    estadiaAtiva, reservaDoDia, statusQuarto, noites, conflitos, conta, tarifa, dadosContratante, saldoProduto, contratanteDireto, noitesNoPeriodo, vendidas, codigoVoucher,
     exportarTudo, importarTudo, limparDadosHotel
   };
 })();

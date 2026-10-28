@@ -26,6 +26,7 @@ const APP = (function () {
     relatorios: '<path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-3"/>',
     acessos: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 4.5l1.5 1.5 3-3"/>',
     configuracoes: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    lancar: '<path d="M3 4h2l2.4 11h11.2L21 8H7"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/><path d="M13 9v4M11 11h4"/>',
     mais: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     mais2: '<path d="M12 5v14M5 12h14"/>',
     busca: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
@@ -48,6 +49,7 @@ const APP = (function () {
     { tela: 'tela-hospedes', modulo: 'hospedes', nome: 'Cadastro de hóspedes', curto: 'Hóspedes', ic: 'hospedes' },
     { tela: 'tela-voucher', modulo: 'voucher', nome: 'Emissão de voucher', curto: 'Voucher', ic: 'voucher' },
     { tela: 'tela-movimento', modulo: 'movimento', nome: 'Entradas e saídas', curto: 'Entradas', ic: 'movimento' },
+    { tela: 'tela-lancar', modulo: 'movimento', nome: 'Lançar no quarto', curto: 'Lançar', ic: 'lancar' },
     { tela: 'tela-financeiro', modulo: 'financeiro', nome: 'Financeiro', curto: 'Financeiro', ic: 'financeiro' },
     { tela: 'tela-relatorios', modulo: 'relatorios', nome: 'Relatórios', curto: 'Relatórios', ic: 'relatorios' }
   ];
@@ -55,10 +57,10 @@ const APP = (function () {
     { tela: 'tela-acessos', modulo: '_admin', nome: 'Acessos', curto: 'Acessos', ic: 'acessos' },
     { tela: 'tela-config', modulo: 'configuracoes', nome: 'Configurações', curto: 'Config.', ic: 'configuracoes' }
   ];
-  const PRIORIDADE_MOVEL = ['tela-inicio', 'tela-quartos', 'tela-movimento', 'tela-hospedes', 'tela-voucher', 'tela-financeiro', 'tela-relatorios'];
+  const PRIORIDADE_MOVEL = ['tela-inicio', 'tela-quartos', 'tela-movimento', 'tela-lancar', 'tela-hospedes', 'tela-voucher', 'tela-financeiro', 'tela-relatorios'];
   const MODULOS_JS = {
     'tela-inicio': 'INICIO', 'tela-quartos': 'QUARTOS', 'tela-hospedes': 'HOSPEDES', 'tela-voucher': 'VOUCHER',
-    'tela-movimento': 'MOVIMENTO', 'tela-financeiro': 'FINANCEIRO', 'tela-relatorios': 'RELATORIOS',
+    'tela-movimento': 'MOVIMENTO', 'tela-lancar': 'LANCAR', 'tela-financeiro': 'FINANCEIRO', 'tela-relatorios': 'RELATORIOS',
     'tela-acessos': 'ACESSOS', 'tela-config': 'AJUSTES'
   };
   const TELAS_PUBLICAS = ['tela-login', 'tela-cadastro', 'tela-recuperar', 'tela-pendente', 'tela-novasenha'];
@@ -324,6 +326,7 @@ const APP = (function () {
   function podeTela(tela) {
     if (tela === 'tela-acessos') return AUTH.ehAdmin();
     if (tela === 'tela-config') return AUTH.podeVer('configuracoes');
+    if (tela === 'tela-lancar') return AUTH.podeVer('movimento');
     if (['tela-mais', 'tela-conta', 'tela-semacesso'].indexOf(tela) !== -1) return true;
     const m = CONFIG.moduloDaTela(tela);
     return m ? AUTH.podeVer(m) : false;

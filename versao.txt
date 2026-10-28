@@ -1,3 +1,3 @@
 Hotel Estilo Fino — Sistema de Gestão
-versão publicada: 1.0.1 (base central Supabase ligada: dados compartilhados entre aparelhos, liberação de acessos pelo administrador)
-atualizado em: 2026-10-27
+versão publicada: 1.1.0 (frigobar e produtos com estoque; tarifas por contratante — hóspede direto, empresas, agências e sites — com prazo de recebimento e comissão; tela Lançar no quarto com busca por CPF, nome ou celular)
+atualizado em: 2026-10-28

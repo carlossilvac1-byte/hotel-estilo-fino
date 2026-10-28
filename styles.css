@@ -415,3 +415,20 @@ body.publico .app { display: none; }
   .imprimir { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; }
   .voucher .v-cab, .v-rodape, .v-faixa { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ============================ LANÇAR NO QUARTO ============================ */
+.grade-produtos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.produto-btn {
+  position: relative; text-align: left; background: #FFF; border: 1px solid var(--borda); border-radius: 12px; padding: 12px;
+  display: flex; flex-direction: column; gap: 4px; min-height: 96px; color: var(--texto);
+}
+.produto-btn:hover:not(:disabled) { border-color: var(--ouro); background: var(--fundo); }
+.produto-btn b { font-size: 14px; line-height: 1.25; }
+.produto-btn .preco { font-size: 17px; font-weight: 800; }
+.produto-btn small { font-size: 12px; }
+.produto-btn .qtd-carrinho {
+  position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; border-radius: 13px; padding: 0 6px;
+  background: var(--escuro); color: var(--ouro-claro); font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;
+}
+.tarifas-tabela input { width: 120px; height: 38px; border-radius: 9px; border: 1px solid #D9CDB4; padding: 0 8px; }
+@media (max-width: 600px) { .grade-produtos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
