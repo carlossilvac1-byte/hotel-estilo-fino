@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#231F20">
+  <meta name="description" content="Hotel Estilo Fino — Sistema de Gestão: quartos, hóspedes, reservas, vouchers, entradas e saídas, financeiro e relatórios. Funciona no navegador e no celular, inclusive sem internet.">
+  <title>Hotel Estilo Fino — Sistema de Gestão</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preload" href="fonts/manrope.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Estilo Fino">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+</head>
+<body class="publico">
+
+<!-- =====================================================================
+     TELAS DE ACESSO (login, cadastro, recuperação, aguardando liberação)
+     ================================================================== -->
+<div class="acesso" id="acesso">
+  <img src="assets/logo.png" alt="Hotel Estilo Fino" class="logo">
+
+  <section class="cartao-acesso" id="tela-login" hidden>
+    <h1>Bem-vindo</h1>
+    <p>Entre para acessar o sistema de gestão do hotel.</p>
+    <div class="aviso-embutido" id="aviso-modo-local" hidden>
+      <b>Modo local:</b> a base central ainda não foi ligada. As contas e os dados ficam somente
+      neste aparelho. A primeira conta criada aqui é a do administrador.
+    </div>
+    <div class="aviso-embutido" id="aviso-offline-login" hidden>Sem conexão — é possível entrar com a última conta usada neste aparelho.</div>
+    <label class="fld">E-mail<input type="email" id="login-email" autocomplete="username" inputmode="email" placeholder="nome@email.com" enterkeyhint="next"></label>
+    <label class="fld">Senha<input type="password" id="login-senha" autocomplete="current-password" placeholder="Sua senha" enterkeyhint="go"></label>
+    <span class="erro-campo" id="login-erro"></span>
+    <button type="button" class="btn btn-escuro btn-bloco" id="btn-login">Entrar</button>
+    <div class="links-acesso">
+      <button type="button" class="btn btn-texto" id="link-esqueci">Esqueci minha senha</button>
+      <span>Primeiro acesso? <button type="button" class="btn btn-texto" id="link-cadastro">Criar cadastro</button></span>
+    </div>
+  </section>
+
+  <section class="cartao-acesso largo" id="tela-cadastro" hidden>
+    <h1>Criar cadastro</h1>
+    <p>Depois de enviado, o acesso é liberado pelo administrador do sistema.</p>
+    <label class="fld">Nome completo<input type="text" id="cad-nome" autocomplete="name" placeholder="Nome e sobrenome"></label>
+    <div class="grade-campos">
+      <label class="fld">Telefone / WhatsApp<input type="tel" id="cad-telefone" autocomplete="tel" inputmode="tel" placeholder="(89) 90000-0000"></label>
+      <label class="fld">Cargo<select id="cad-cargo"></select></label>
+    </div>
+    <label class="fld">E-mail<input type="email" id="cad-email" autocomplete="email" inputmode="email" placeholder="nome@email.com"></label>
+    <div class="grade-campos">
+      <label class="fld">Senha<input type="password" id="cad-senha" autocomplete="new-password" placeholder="Mín. 8, letra e número"></label>
+      <label class="fld">Confirmar senha<input type="password" id="cad-confirmacao" autocomplete="new-password"></label>
+    </div>
+    <span class="erro-campo" id="cad-erro"></span>
+    <button type="button" class="btn btn-escuro btn-bloco" id="btn-cadastrar">Enviar cadastro</button>
+    <div class="links-acesso"><button type="button" class="btn btn-texto" data-ir-publico="tela-login">Voltar para o login</button></div>
+  </section>
+
+  <section class="cartao-acesso" id="tela-recuperar" hidden>
+    <h1>Recuperar senha</h1>
+    <p>Informe o e-mail do cadastro. Você receberá um link para criar uma nova senha.</p>
+    <label class="fld">E-mail<input type="email" id="rec-email" autocomplete="username" inputmode="email"></label>
+    <span class="erro-campo" id="rec-erro"></span>
+    <button type="button" class="btn btn-escuro btn-bloco" id="btn-recuperar">Enviar link</button>
+    <div class="links-acesso"><button type="button" class="btn btn-texto" data-ir-publico="tela-login">Voltar para o login</button></div>
+  </section>
+
+  <section class="cartao-acesso" id="tela-novasenha" hidden>
+    <h1>Nova senha</h1>
+    <p>Defina a nova senha de acesso.</p>
+    <label class="fld">Nova senha<input type="password" id="ns-senha" autocomplete="new-password" placeholder="Mín. 8, letra e número"></label>
+    <label class="fld">Confirmar nova senha<input type="password" id="ns-confirmacao" autocomplete="new-password"></label>
+    <span class="erro-campo" id="ns-erro"></span>
+    <button type="button" class="btn btn-escuro btn-bloco" id="btn-novasenha">Salvar nova senha</button>
+  </section>
+
+  <section class="cartao-acesso" id="tela-pendente" hidden>
+    <h1>Aguardando liberação</h1>
+    <p id="pendente-texto">Seu cadastro foi recebido e está aguardando a liberação do administrador.</p>
+    <div class="aviso-embutido" id="pendente-contato"></div>
+    <a class="btn btn-ouro btn-bloco" id="pendente-whats" target="_blank" rel="noopener">Avisar o administrador pelo WhatsApp</a>
+    <div class="links-acesso"><button type="button" class="btn btn-texto" data-ir-publico="tela-login">Voltar para o login</button></div>
+  </section>
+
+  <p class="rodape-acesso" id="rodape-versao"></p>
+</div>
+
+<!-- =====================================================================
+     SISTEMA (após o login)
+     ================================================================== -->
+<div class="app" id="app">
+  <aside class="lateral" aria-label="Menu principal">
+    <img src="assets/logo.png" alt="Hotel Estilo Fino" class="lateral-logo">
+    <nav class="menu" id="menu-lateral"></nav>
+    <div class="lateral-rodape">
+      <button type="button" class="pilula-sync" id="pilula-sync" title="Sincronização"><span class="ponto" id="ponto-sync"></span><span id="txt-sync">Verificando…</span></button>
+      <button type="button" class="cartao-usuario" id="cartao-usuario" title="Minha conta">
+        <span class="avatar" id="usuario-ini">--</span>
+        <span><b id="usuario-nome">Usuário</b><small id="usuario-cargo">—</small></span>
+      </button>
+    </div>
+  </aside>
+
+  <header class="topo-movel">
+    <img src="assets/logo.png" alt="Hotel Estilo Fino">
+    <button type="button" class="pilula-sync" id="pilula-sync-movel"><span class="ponto" id="ponto-sync-movel"></span><span id="txt-sync-movel">…</span></button>
+  </header>
+
+  <main class="principal" id="principal">
+    <div class="faixa" id="faixa-fila" hidden role="status">
+      <span><b id="faixa-fila-qtd">0 registros aguardando envio</b> · serão enviados assim que houver internet.</span>
+      <button type="button" class="btn btn-peq" id="btn-faixa-enviar">Enviar agora</button>
+    </div>
+    <div class="faixa roxa" id="faixa-local" hidden>
+      <span><b>Modo local</b> · base central não configurada: os dados ficam somente neste aparelho. Faça backup em Configurações.</span>
+    </div>
+    <div class="faixa vermelha" id="faixa-tabela" hidden></div>
+
+    <section class="tela" id="tela-inicio" hidden></section>
+    <section class="tela" id="tela-quartos" hidden></section>
+    <section class="tela" id="tela-hospedes" hidden></section>
+    <section class="tela" id="tela-voucher" hidden></section>
+    <section class="tela" id="tela-movimento" hidden></section>
+    <section class="tela" id="tela-financeiro" hidden></section>
+    <section class="tela" id="tela-relatorios" hidden></section>
+    <section class="tela" id="tela-acessos" hidden></section>
+    <section class="tela" id="tela-config" hidden></section>
+    <section class="tela" id="tela-mais" hidden></section>
+    <section class="tela" id="tela-conta" hidden></section>
+    <section class="tela" id="tela-semacesso" hidden>
+      <div class="card"><h2>Sem módulos liberados</h2><p class="apoio">Seu usuário está ativo, mas ainda não recebeu acesso a nenhum módulo. Fale com o administrador.</p></div>
+    </section>
+  </main>
+
+  <nav class="nav-inferior" id="nav-inferior" aria-label="Navegação"></nav>
+</div>
+
+<!-- Avisos, carregando e janelas -->
+<div class="avisos" id="avisos" aria-live="polite"></div>
+<div class="carregando" id="carregando" hidden><div class="giro"></div><span id="txt-carregando">Processando…</span></div>
+<div id="modais"></div>
+
+<script src="vendor/dexie.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="auth.js"></script>
+<script src="sync.js"></script>
+<script src="pdf.js"></script>
+<script src="app.js"></script>
+<script src="inicio.js"></script>
+<script src="quartos.js"></script>
+<script src="hospedes.js"></script>
+<script src="voucher.js"></script>
+<script src="movimento.js"></script>
+<script src="financeiro.js"></script>
+<script src="relatorios.js"></script>
+<script src="acessos.js"></script>
+<script src="ajustes.js"></script>
+</body>
+</html>
