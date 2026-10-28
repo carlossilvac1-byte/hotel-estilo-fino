@@ -14,7 +14,9 @@ Enquanto este passo não for feito, o sistema funciona em **modo local** (dados 
 2. Nova query → cole `banco/02-administrador.sql` → **Run**.
    Define `ce142734@gmail.com` como administrador. **Este arquivo não vai para o GitHub.**
 
-Os dois scripts podem ser executados de novo sem quebrar nada.
+3. Nova query → cole `banco/03-atualizacao-v1.1.sql` → **Run** (produtos/frigobar e contratantes com tarifas).
+
+Os scripts podem ser executados de novo sem quebrar nada.
 
 ## 3. Configurar o login
 **Authentication → URL Configuration**
