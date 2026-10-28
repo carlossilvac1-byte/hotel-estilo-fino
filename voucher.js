@@ -142,8 +142,10 @@ const VOUCHER = (function () {
       '<button type="button" class="btn" id="vc-imprimir">Imprimir</button>' +
       '<button type="button" class="btn" id="vc-email">Enviar por e-mail</button>' +
       '<button type="button" class="btn btn-suave" id="vc-whats">Enviar por WhatsApp</button></div>' +
-      (reg && reg.status === 'reservada' && AUTH.podeEditar('voucher') ? '<button type="button" class="btn btn-perigo" id="vc-cancelar">Cancelar reserva</button>' : '') +
       (reg && reg.status === 'reservada' && AUTH.podeEditar('movimento') ? '<button type="button" class="btn" id="vc-checkin">' + icone('entrar', 18) + 'Fazer check-in desta reserva</button>' : '') +
+      (reg && (podeCancelar(reg) || podeExcluir(d, reg)) ? '<div class="grade-botoes">' +
+        (podeCancelar(reg) ? '<button type="button" class="btn btn-perigo" id="vc-cancelar">Cancelar voucher</button>' : '') +
+        (podeExcluir(d, reg) ? '<button type="button" class="btn btn-perigo" id="vc-excluir">Excluir voucher</button>' : '') + '</div>' : '') +
       '</form>' +
       '<section aria-label="Pré-visualização do voucher" style="flex:1.2 1 520px;min-width:0;display:flex;flex-direction:column;gap:10px">' +
       '<span class="kl">Pré-visualização</span><div id="vc-preview"></div>' +
@@ -226,7 +228,8 @@ const VOUCHER = (function () {
     go('#vc-imprimir', () => acao(d, reg, 'imprimir'));
     go('#vc-email', () => acao(d, reg, 'email'));
     go('#vc-whats', () => acao(d, reg, 'whats'));
-    go('#vc-cancelar', () => cancelar(reg));
+    go('#vc-cancelar', () => cancelar(d, reg));
+    go('#vc-excluir', () => excluir(d, reg));
     go('#vc-checkin', () => APP.ir('tela-movimento', { reserva: reg.id, fazerCheckin: true }));
     desenharRecentes(d);
   }
@@ -391,12 +394,59 @@ const VOUCHER = (function () {
     }
   }
 
-  async function cancelar(reg) {
-    const r = await APP.confirmar('Cancelar reserva', 'Cancelar a reserva ' + reg.codigo + ' de ' + reg.hospede_nome + '? O quarto fica livre para o período.', { rotuloOk: 'Cancelar reserva', perigo: true, campo: 'Motivo (opcional)' });
+  /* ---------- Cancelar e excluir ---------- */
+  const vinculos = (d, reg) => ({
+    consumos: d.consumos.filter(c => c.reserva_id === reg.id),
+    lancamentos: d.lancamentos.filter(l => l.reserva_id === reg.id)
+  });
+
+  /** Reserva confirmada: quem edita vouchers. Hóspede já na casa (check-in por engano): quem edita a movimentação. */
+  function podeCancelar(reg) {
+    if (reg.status === 'reservada') return AUTH.podeEditar('voucher') || AUTH.podeEditar('movimento');
+    if (reg.status === 'hospedado') return AUTH.podeEditar('movimento');
+    return false;
+  }
+
+  /** Administrador exclui qualquer voucher (com os lançamentos ligados).
+   *  Demais usuários: só reserva confirmada ou cancelada, sem consumo nem lançamento financeiro. */
+  function podeExcluir(d, reg) {
+    if (AUTH.ehAdmin()) return true;
+    if (!AUTH.podeEditar('voucher') || (reg.status !== 'reservada' && reg.status !== 'cancelada')) return false;
+    const v = vinculos(d, reg);
+    return !v.consumos.length && !v.lancamentos.length;
+  }
+
+  async function cancelar(d, reg) {
+    const hosp = reg.status === 'hospedado';
+    const v = vinculos(d, reg);
+    const txt = 'Cancelar o voucher ' + reg.codigo + ' de ' + reg.hospede_nome + '? O quarto fica livre para o período.' +
+      (hosp ? ' O hóspede já fez check-in: a estadia será anulada' + (v.consumos.length ? ' e os ' + v.consumos.length + ' consumo(s) lançados no quarto serão estornados' : '') +
+        '.' + (v.lancamentos.length ? ' Recebimentos já lançados continuam no Financeiro para conferência.' : '') : '');
+    const r = await APP.confirmar('Cancelar voucher', txt, { rotuloOk: 'Cancelar voucher', perigo: true, campo: 'Motivo (opcional)' });
     if (!r.ok) return;
+    if (hosp) for (const c of v.consumos) await DB.excluir('consumos', c.id);
     await DB.salvar('reservas', Object.assign({}, reg, { status: 'cancelada', observacoes: (reg.observacoes ? reg.observacoes + ' | ' : '') + 'Cancelada em ' + dataBR(DB.hoje()) + (r.valor ? ': ' + r.valor : '') }));
-    APP.aviso('Reserva cancelada.', 'sucesso');
+    APP.aviso('Voucher ' + reg.codigo + ' cancelado.', 'sucesso');
     montar({ reserva: reg.id });
+  }
+
+  async function excluir(d, reg) {
+    const v = vinculos(d, reg);
+    const extra = [];
+    if (v.consumos.length) extra.push(v.consumos.length + ' consumo(s)');
+    if (v.lancamentos.length) extra.push(v.lancamentos.length + ' lançamento(s) financeiro(s)');
+    const r = await APP.confirmar('Excluir voucher',
+      'Excluir definitivamente o voucher ' + reg.codigo + ' de ' + reg.hospede_nome + '?' +
+      (extra.length ? ' Também serão excluídos ' + extra.join(' e ') + ' ligados a ele.' : '') +
+      ' Esta ação não pode ser desfeita. O cadastro do hóspede é mantido.',
+      { rotuloOk: 'Excluir voucher', perigo: true });
+    if (!r.ok) return;
+    for (const c of v.consumos) await DB.excluir('consumos', c.id);
+    for (const l of v.lancamentos) await DB.excluir('lancamentos', l.id);
+    await DB.excluir('reservas', reg.id);
+    APP.aviso('Voucher ' + reg.codigo + ' excluído.', 'sucesso');
+    st.id = null;
+    montar();
   }
 
   return { montar: montar, previewHTML: previewHTML, dadosPreview: dadosPreview, textoQR: textoQR };

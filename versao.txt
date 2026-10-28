@@ -1,3 +1,4 @@
 Hotel Estilo Fino — Sistema de Gestão
-versão publicada: 1.1.0 (frigobar e produtos com estoque; tarifas por contratante — hóspede direto, empresas, agências e sites — com prazo de recebimento e comissão; tela Lançar no quarto com busca por CPF, nome ou celular)
+versão publicada: 1.1.1 (cancelar e excluir voucher; check-in por engano pode ser anulado com estorno dos consumos)
+anterior: 1.1.0 (frigobar e produtos com estoque; tarifas por contratante com prazo e comissão; tela Lançar no quarto)
 atualizado em: 2026-10-28

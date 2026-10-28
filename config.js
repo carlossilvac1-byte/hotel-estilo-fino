@@ -16,7 +16,7 @@ const CONFIG = {
     nome: 'Hotel Estilo Fino — Sistema de Gestão',
     nomeCurto: 'Estilo Fino',
     hotel: 'Hotel Estilo Fino',
-    versao: '1.1.0',
+    versao: '1.1.1',
     prefixoVoucher: 'HEF'
   },
 

@@ -7,7 +7,7 @@
  * AO PUBLICAR NOVA VERSÃO: altere VERSAO (junto com config.js).
  * ===================================================================== */
 
-const VERSAO = 'v1.1.0';
+const VERSAO = 'v1.1.1';
 const CACHE = 'hotel-estilo-fino-' + VERSAO;
 
 const ARQUIVOS = [
